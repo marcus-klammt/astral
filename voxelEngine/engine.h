@@ -2,6 +2,7 @@
 #include "defs.h"
 #include "shaders.h"
 #include <vector>
+#include <list>
 
 class input 
 {
@@ -24,7 +25,7 @@ public:
 	{
 		inputClass = input();
 	}
-	std::vector<Script> scripts;
+	std::list<Script> scripts;
 	std::vector<Shader> shaders;
 
 	input inputClass;
@@ -43,13 +44,11 @@ public:
 
 	Script* script;
 	render* rendering;
+
 	Script() {
 
 	}
-	Script(render* render)
-	{
-		rendering = render;
-	}
+	
 	virtual void Update() {};
 	virtual void Start() {}
 	int index = 0;

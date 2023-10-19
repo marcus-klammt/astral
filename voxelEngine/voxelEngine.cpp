@@ -1,6 +1,5 @@
 #include "voxelEngine.h"
 
-VoxelEngine* engine;
 
 //right now i have all the scripts in this class, which is not very clean, however the rest of the code is generally clean
 class VoxelGeneration : public Script {
@@ -100,8 +99,8 @@ public:
 			}
 		}
 	}
-
 	unsigned int VAO, VBO, EBO;
+
 
 	void Update() override {
 
@@ -112,14 +111,9 @@ public:
 
 		shader.setMatrix4x4("model", model);
 		shader.setMatrix4x4("projection", projection);
-
-		//generate em
-		glGenVertexArrays(1, &VAO);
-		glGenBuffers(1, &VBO);
-		glGenBuffers(1, &EBO);
+	
 
 		//generates our little voxel chunk
-		generateMesh();
 
 		//bind em
 		glBindVertexArray(VAO);
@@ -136,11 +130,24 @@ public:
 		                                                                //neat little trick to get the memory offset of a varible in a struct // cast this to a pointer
 		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
 
+		
+
 		//drawwww
 		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
 
+
+
 	}
-	void Start() {
+	void Start() override 
+	{
+
+		//generate em
+		glGenVertexArrays(1, &VAO);
+		glGenBuffers(1, &VBO);
+		glGenBuffers(1, &EBO);
+
+		generateMesh();
+
 		shader.Set("shaders/vertex.txt", "shaders/fragment.txt");
 		rendering->shaders.push_back(shader);
 		shader.use();
@@ -157,11 +164,18 @@ public:
 
 	bool isDebugModeOn = false;
 
+
+	int flag = 0;
 	void Update() override
 	{
-		if (this->rendering->inputClass.isKeyDown(this->rendering->window, GLFW_KEY_TAB))
+		if (GetAsyncKeyState(VK_TAB) & 0x8000 && flag == 0)
 		{
+			flag = 1;
 			isDebugModeOn = !isDebugModeOn;
+		}
+		else if (GetAsyncKeyState(VK_TAB) == 0) 
+		{
+			flag = 0;
 		}
 
 		if (isDebugModeOn)
@@ -182,17 +196,16 @@ public:
 
 int main()
 {
-	VoxelEngine temp;
 
-	engine = &temp;
+	VoxelEngine engine = VoxelEngine();
 
-	VoxelGeneration voxels(&engine->m_rendering);
-	engine->AddScript(voxels);
+	VoxelGeneration voxels(&engine.m_rendering);
+	engine.AddScript(voxels);
 
-	Debug debug(&engine->m_rendering);
-	engine->AddScript(debug);
+	Debug debug(&engine.m_rendering);
+	engine.AddScript(debug);
 
-	engine->initialize();
+	engine.initialize();
 
 }
 

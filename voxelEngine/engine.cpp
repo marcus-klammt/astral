@@ -2,7 +2,7 @@
 
 Camera camera;
 
-float deltaTime = 0.0f;	
+float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 void frameBuffer(GLFWwindow* window, int width, int height);
@@ -30,10 +30,12 @@ void render::initalize()
 		return;
 	}
 
-	for (Script script : scripts)
+	for (Script scr : scripts)
 	{
-		script.script->Start();
+		scr.script->Start();
+
 	}
+
 
 	glEnable(GL_DEPTH_TEST);
 	camera = Camera();
@@ -54,10 +56,18 @@ void render::renderLoop()
 		if (inputClass.isKeyDown(window, GLFW_KEY_ESCAPE))
 		{
 			glfwTerminate();
-			exit(0);
 		}
 		frame();
 	}
+
+
+	shaders.clear();
+	shaders.shrink_to_fit();
+
+	scripts.clear();
+	shaders.shrink_to_fit();
+
+
 
 	glfwTerminate();
 	return;
@@ -67,11 +77,12 @@ void render::frame()
 {
 	glClearColor(0, 0.25f, .4f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
+
 	camera.handleMovement();
-	for (Script script : scripts)
+	for (Script scr : scripts)
 	{
-		script.script->Update();
+		scr.script->Update();
+
 	}
 
 	for (Shader shader : shaders)

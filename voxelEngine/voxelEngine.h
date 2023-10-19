@@ -4,12 +4,16 @@
 
 class VoxelEngine {
 public:
-	VoxelEngine()
-	{
-	}
 
 	render m_rendering;
+
 	int m_scriptsLoaded;
+	VoxelEngine()
+	{
+		m_rendering = render();
+	}
+
+	
 
 	void AddScript(Script script)
 	{
@@ -20,7 +24,6 @@ public:
 	}
 	void RemoveScript(Script script)
 	{
-		m_rendering.scripts.erase(m_rendering.scripts.begin() + script.index - 1);
 	}
 	
 	void initialize()
