@@ -11,6 +11,5 @@ Chunks are 16x64x16 blocks of terrain which can be generated using a seed. Chunk
 Chunks are only rendered if the player can see the terrain, meaning there is no vertices that are rendered underground. This allows for many chunks to be loaded at once with little strain on the gpu.
 ![2023-10-22 21-40-32](https://github.com/marcus-klammt/astral/assets/55520137/89b06c23-fc93-410c-9c51-18be077c2cff)
 
-Roadmap: https://trello.com/b/Z0PYRrRu
+Public Roadmap: https://trello.com/b/Z0PYRrRu
 
-# Screenshots![FirstWeek1](https://github.com/marcus-klammt/astral/assets/55520137/13e3934b-a592-4dbb-8f51-7b4f74a5732b)
