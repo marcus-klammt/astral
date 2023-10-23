@@ -52,6 +52,11 @@ public:
 		glUniformMatrix4fv(glGetUniformLocation(shaderId, name.c_str()), 1, GL_FALSE, glm::value_ptr(value));
 	}
 
+	void setVector3(const std::string& name, glm::vec3 value) const
+	{
+		glUniform3fv(glGetUniformLocation(shaderId, name.c_str()), 1, glm::value_ptr(value));
+	}
+
 private:
 	unsigned int vertex;
 	unsigned int fragment;

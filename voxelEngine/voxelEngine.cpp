@@ -1,11 +1,36 @@
 #include "voxelEngine.h"
-
+#include "FastNoiseLight.h"
+#include <thread>
 
 //right now i have all the scripts in this class, which is not very clean, however the rest of the code is generally clean
 class VoxelGeneration : public Script {
 public:
+	struct Vertex {
+		glm::vec3 pos;
+		glm::vec3 color;
+	};
+
+	std::vector<Vertex> vertices;
+	std::vector<unsigned int> indices;
 
 	Shader shader;
+
+	glm::vec3 lightDirection = glm::vec3(1,1,4);
+
+	//our chunk size, set to 64 max height so chunks are super slow
+	int GRID_SIZE_X = 16;
+	int GRID_SIZE_Y = 64;
+	int GRID_SIZE_Z = 16;
+
+	//seed
+	int seedNum = 123;
+
+	//trying to cache our vector size function
+	int gridSizeX = 0;
+	int gridSizeY = 0;
+	int gridSizeZ = 0;
+
+	unsigned int VAO, VBO, EBO;
 
 	VoxelGeneration(render* render)
 	{
@@ -13,108 +38,210 @@ public:
 		script = this;
 	}
 
-	struct Vertex {
-		glm::vec3 pos;
-		glm::vec3 color;
-	};
+	//clamp not working lol??
+	template <typename T>
+	T clip(const T& n, const T& lower, const T& upper) {
+		return std::max(lower, std::min(n, upper));
+	}
 
-	struct VoxelData {
-		glm::vec3 color;
-	};
+	using VoxelGrid = std::vector<std::vector<std::vector<int>>>;
 
-	int GRID_SIZE_X = 10;
-	int GRID_SIZE_Y = 10;
-	int GRID_SIZE_Z = 10;
+	VoxelGrid createEmptyVoxelGrid(int sizeX, int sizeY, int sizeZ) {
+		return VoxelGrid(sizeX, std::vector<std::vector<int>>(sizeY, std::vector<int>(sizeZ, 0)));
+	}
 
-	std::vector<Vertex> vertices;
-	std::vector<unsigned int> indices;
-
-	void generateMesh()
+	VoxelGrid generateVoxelGrid(int seed)
 	{
-		vertices.clear();
-		indices.clear();
+		VoxelGrid voxelGrid = createEmptyVoxelGrid(GRID_SIZE_X, GRID_SIZE_Y, GRID_SIZE_Z);
 
-		int count = 0;
-		for (int x = 0; x < GRID_SIZE_X; ++x) {
-			for (int y = 0; y < GRID_SIZE_Y; ++y) {
-				for (int z = 0; z < GRID_SIZE_Z; ++z) {
-					float voxelSize = 1.0f;
-					float offsetX = x * voxelSize;
-					float offsetY = y * voxelSize;
-					float offsetZ = z * voxelSize;
+		FastNoiseLite noiseGen = (seed);
+		//open to change settings etc.
+		noiseGen.SetFractalOctaves(4);
+		noiseGen.SetFractalLacunarity(1.75);
+		noiseGen.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+		noiseGen.SetFractalType(FastNoiseLite::FractalType_FBm);
 
-					glm::vec3 color = glm::vec3(
-						static_cast<float>(x) / GRID_SIZE_X,
-						static_cast<float>(y) / GRID_SIZE_Y,
-						static_cast<float>(z) / GRID_SIZE_Z
-					);
+		//loop through our set chunk size
+		//we do two loops to make sure culling of inside faces work, i need to fix this as we end up calling our noise function two times more then we need
+		for (int x = 0; x < GRID_SIZE_X; ++x)
+		{
+			for (int z = 0; z < GRID_SIZE_Z; ++z)
+			{
+				float noiseValue = noiseGen.GetNoise(static_cast<float>(x), static_cast<float>(z) / 2.0f + .5f);
 
-					// Front face
-					vertices.push_back({ glm::vec3(offsetX, offsetY, offsetZ), color });
-					vertices.push_back({ glm::vec3(offsetX + voxelSize, offsetY, offsetZ), color });
-					vertices.push_back({ glm::vec3(offsetX + voxelSize, offsetY + voxelSize, offsetZ), color });
-					vertices.push_back({ glm::vec3(offsetX, offsetY + voxelSize, offsetZ), color });
+				int32_t height = 10 + static_cast<int32_t>(noiseValue * 45);
+				//clamp
+				height = clip(height, 0, 64);
+				//set the bottom of our voxel grid
+				voxelGrid[x][0][z] = 1;
 
-					// Back face
-					vertices.push_back({ glm::vec3(offsetX, offsetY, offsetZ + voxelSize), color });
-					vertices.push_back({ glm::vec3(offsetX + voxelSize, offsetY, offsetZ + voxelSize), color });
-					vertices.push_back({ glm::vec3(offsetX + voxelSize, offsetY + voxelSize, offsetZ + voxelSize), color });
-					vertices.push_back({ glm::vec3(offsetX, offsetY + voxelSize, offsetZ + voxelSize), color });
-
-					// Left face
-					vertices.push_back({ glm::vec3(offsetX, offsetY, offsetZ + voxelSize), color });
-					vertices.push_back({ glm::vec3(offsetX, offsetY, offsetZ), color });
-					vertices.push_back({ glm::vec3(offsetX, offsetY + voxelSize, offsetZ), color });
-					vertices.push_back({ glm::vec3(offsetX, offsetY + voxelSize, offsetZ + voxelSize), color });
-
-					// Right face
-					vertices.push_back({ glm::vec3(offsetX + voxelSize, offsetY, offsetZ), color });
-					vertices.push_back({ glm::vec3(offsetX + voxelSize, offsetY, offsetZ + voxelSize), color });
-					vertices.push_back({ glm::vec3(offsetX + voxelSize, offsetY + voxelSize, offsetZ + voxelSize), color });
-					vertices.push_back({ glm::vec3(offsetX + voxelSize, offsetY + voxelSize, offsetZ), color });
-
-					// Top face
-					vertices.push_back({ glm::vec3(offsetX, offsetY + voxelSize, offsetZ), color });
-					vertices.push_back({ glm::vec3(offsetX + voxelSize, offsetY + voxelSize, offsetZ), color });
-					vertices.push_back({ glm::vec3(offsetX + voxelSize, offsetY + voxelSize, offsetZ + voxelSize), color });
-					vertices.push_back({ glm::vec3(offsetX, offsetY + voxelSize, offsetZ + voxelSize), color });
-
-					// Bottom face
-					vertices.push_back({ glm::vec3(offsetX, offsetY, offsetZ), color });
-					vertices.push_back({ glm::vec3(offsetX + voxelSize, offsetY, offsetZ), color });
-					vertices.push_back({ glm::vec3(offsetX + voxelSize, offsetY, offsetZ + voxelSize), color });
-					vertices.push_back({ glm::vec3(offsetX, offsetY, offsetZ + voxelSize), color });
-
-					// Indices for the cube
-					unsigned int baseIndex = static_cast<unsigned int>(vertices.size()) - 24;
-					for (unsigned int i = 0; i < 6; ++i) {
-						indices.push_back(baseIndex + i * 4);
-						indices.push_back(baseIndex + i * 4 + 1);
-						indices.push_back(baseIndex + i * 4 + 2);
-						indices.push_back(baseIndex + i * 4);
-						indices.push_back(baseIndex + i * 4 + 2);
-						indices.push_back(baseIndex + i * 4 + 3);
-					}
+				for (int32_t y = 0; y < height; y++)
+				{
+					//set voxels for however high the noise gets us
+					voxelGrid[x][y][z] = 1;
 				}
 			}
 		}
+
+		//caching our 3d vector sizes to try and sqeeze performance
+		gridSizeX = voxelGrid.size();
+		gridSizeY = voxelGrid[0].size();
+		gridSizeZ = voxelGrid[0][0].size();
+
+		//same idea just actually placing the blocks now
+		for (int x = 0; x < GRID_SIZE_X; ++x)
+		{
+			for (int z = 0; z < GRID_SIZE_Z; ++z)
+			{
+				float noiseValue = noiseGen.GetNoise(static_cast<float>(x), static_cast<float>(z) / 2.0f + .5f);
+
+				int32_t height = 10 + static_cast<int32_t>(noiseValue * 45);
+
+				height = clip(height, 0, 64);
+				placeBlock(voxelGrid, x, 0, z);
+
+				for (int32_t y = 0; y < height; y++)
+				{
+					placeBlock(voxelGrid, x, y, z);
+
+				}
+			}
+		}
+		return voxelGrid;
 	}
-	unsigned int VAO, VBO, EBO;
+	//voxel check
+	bool hasVoxelAt(VoxelGrid grid, int x, int y, int z)
+	{
+		if (x >= 0 && x < gridSizeX && y >= 0 && y < gridSizeY && z >= 0 && z < gridSizeZ) {
+			return grid[x][y][z] == 1;
+		}
+		return false;
+	}
+	//placing blocks, features face culling
+	void placeBlock(VoxelGrid voxelGrid, int x, int y, int z)
+	{
+		//random color for each block
+		glm::vec3 color = glm::vec3(
+			static_cast<float>((double)rand() / (RAND_MAX + 1.0)),
+			static_cast<float>((double)rand() / (RAND_MAX + 1.0)),
+			static_cast<float>((double)rand() / (RAND_MAX + 1.0))
+		);
 
+		if (x == GRID_SIZE_X - 1 || !hasVoxelAt(voxelGrid, x + 1, y, z))
+		{
+			vertices.push_back({ glm::vec3(x + 1, y, z), color });
+			vertices.push_back({ glm::vec3(x + 1, y + 1, z), color });
+			vertices.push_back({ glm::vec3(x + 1, y + 1, z + 1), color });
+			vertices.push_back({ glm::vec3(x + 1, y, z + 1), color });
 
+			unsigned int baseIndex = static_cast<unsigned int>(vertices.size()) - 4;
+			indices.push_back(baseIndex);
+			indices.push_back(baseIndex + 1);
+			indices.push_back(baseIndex + 2);
+			indices.push_back(baseIndex);
+			indices.push_back(baseIndex + 2);
+			indices.push_back(baseIndex + 3);
+		}
+
+		// Check neighbors in the negative X direction
+		if (x == 0 || !hasVoxelAt(voxelGrid, x - 1, y, z)) {
+			// Add faces for the negative X direction
+			vertices.push_back({ glm::vec3(x, y, z), color });
+			vertices.push_back({ glm::vec3(x, y + 1, z), color });
+			vertices.push_back({ glm::vec3(x, y + 1, z + 1), color });
+			vertices.push_back({ glm::vec3(x, y, z + 1), color });
+
+			unsigned int baseIndex = static_cast<unsigned int>(vertices.size()) - 4;
+			indices.push_back(baseIndex);
+			indices.push_back(baseIndex + 1);
+			indices.push_back(baseIndex + 2);
+			indices.push_back(baseIndex);
+			indices.push_back(baseIndex + 2);
+			indices.push_back(baseIndex + 3);
+		}
+
+		// Check neighbors in the positive Y direction
+		if (y == GRID_SIZE_Y - 1 || !hasVoxelAt(voxelGrid, x, y + 1, z)) {
+			// Add faces for the positive Y direction
+			vertices.push_back({ glm::vec3(x, y + 1, z), color });
+			vertices.push_back({ glm::vec3(x + 1, y + 1, z), color });
+			vertices.push_back({ glm::vec3(x + 1, y + 1, z + 1), color });
+			vertices.push_back({ glm::vec3(x, y + 1, z + 1), color });
+
+			unsigned int baseIndex = static_cast<unsigned int>(vertices.size()) - 4;
+			indices.push_back(baseIndex);
+			indices.push_back(baseIndex + 1);
+			indices.push_back(baseIndex + 2);
+			indices.push_back(baseIndex);
+			indices.push_back(baseIndex + 2);
+			indices.push_back(baseIndex + 3);
+		}
+
+		// Check neighbors in the negative Y direction
+		if (y == 0 || !hasVoxelAt(voxelGrid, x, y - 1, z)) {
+			// Add faces for the negative Y direction
+			vertices.push_back({ glm::vec3(x, y, z), color });
+			vertices.push_back({ glm::vec3(x + 1, y, z), color });
+			vertices.push_back({ glm::vec3(x + 1, y, z + 1), color });
+			vertices.push_back({ glm::vec3(x, y, z + 1), color });
+
+			unsigned int baseIndex = static_cast<unsigned int>(vertices.size()) - 4;
+			indices.push_back(baseIndex);
+			indices.push_back(baseIndex + 1);
+			indices.push_back(baseIndex + 2);
+			indices.push_back(baseIndex);
+			indices.push_back(baseIndex + 2);
+			indices.push_back(baseIndex + 3);
+		}
+
+		// Check neighbors in the positive Z direction
+		if (z == GRID_SIZE_Z - 1 || !hasVoxelAt(voxelGrid, x, y, z + 1)) {
+			// Add faces for the positive Z direction
+			vertices.push_back({ glm::vec3(x, y, z + 1), color });
+			vertices.push_back({ glm::vec3(x + 1, y, z + 1), color });
+			vertices.push_back({ glm::vec3(x + 1, y + 1, z + 1), color });
+			vertices.push_back({ glm::vec3(x, y + 1, z + 1), color });
+
+			unsigned int baseIndex = static_cast<unsigned int>(vertices.size()) - 4;
+			indices.push_back(baseIndex);
+			indices.push_back(baseIndex + 1);
+			indices.push_back(baseIndex + 2);
+			indices.push_back(baseIndex);
+			indices.push_back(baseIndex + 2);
+			indices.push_back(baseIndex + 3);
+		}
+
+		// Check neighbors in the negative Z direction
+		if (z == 0 || !hasVoxelAt(voxelGrid, x, y, z - 1)) {
+			// Add faces for the negative Z direction
+			vertices.push_back({ glm::vec3(x, y, z), color });
+			vertices.push_back({ glm::vec3(x + 1, y, z), color });
+			vertices.push_back({ glm::vec3(x + 1, y + 1, z), color });
+			vertices.push_back({ glm::vec3(x, y + 1, z), color });
+
+			unsigned int baseIndex = static_cast<unsigned int>(vertices.size()) - 4;
+			indices.push_back(baseIndex);
+			indices.push_back(baseIndex + 1);
+			indices.push_back(baseIndex + 2);
+			indices.push_back(baseIndex);
+			indices.push_back(baseIndex + 2);
+			indices.push_back(baseIndex + 3);
+		}
+	}
+
+	void generateMesh()
+	{
+		//call this for a new chunk
+		vertices.clear();
+		indices.clear();
+		VoxelGrid voxelGrid = generateVoxelGrid(seedNum);
+	}
+
+	//called every frame
 	void Update() override {
-
 		glm::mat4 model = glm::mat4(1.0f);
-
-		glm::mat4 projection;
-		projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-
 		shader.setMatrix4x4("model", model);
-		shader.setMatrix4x4("projection", projection);
-	
-
-		//generates our little voxel chunk
-
+		shader.setVector3("lightDirection", glm::normalize(lightDirection));
 		//bind em
 		glBindVertexArray(VAO);
 		glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -127,33 +254,67 @@ public:
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
 		//our color
 		glEnableVertexAttribArray(1);
-		                                                                //neat little trick to get the memory offset of a varible in a struct // cast this to a pointer
+		//neat little trick to get the memory offset of a varible in a struct // cast this to a pointer
 		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
-
-		
-
 		//drawwww
 		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-
-
-
 	}
-	void Start() override 
-	{
 
-		//generate em
+	void Start() override
+	{
 		glGenVertexArrays(1, &VAO);
 		glGenBuffers(1, &VBO);
 		glGenBuffers(1, &EBO);
 
-		generateMesh();
+		//multithread this chunk
+		std::thread t(&VoxelGeneration::generateMesh, this);
+		t.detach();
 
 		shader.Set("shaders/vertex.txt", "shaders/fragment.txt");
 		rendering->shaders.push_back(shader);
 		shader.use();
 	}
+
+
+	//also called every frame
+	void OnGui() override
+	{
+		ImGui::Begin("Voxel Rendering");
+		ImGui::Separator();
+
+		char buf[30];
+		sprintf_s(buf, "Vertices in chunk: %d", vertices.size());
+		ImGui::Text(buf);
+
+		ImGui::InputInt("Chunk Seed", &seedNum);
+
+		if (ImGui::Button("Regenerate Chunk"))
+		{
+			glGenVertexArrays(1, &VAO);
+			glGenBuffers(1, &VBO);
+			glGenBuffers(1, &EBO);
+
+			//multithread this chunk
+			std::thread t(&VoxelGeneration::generateMesh, this);
+			t.detach();
+		}
+
+		ImGui::InputFloat("Light Direction X", &lightDirection.x);
+		ImGui::InputFloat("Light Direction Y", &lightDirection.y);
+		ImGui::InputFloat("Light Direction Z", &lightDirection.z);
+
+		ImGui::End();
+	}
+
+	void OnClose() override
+	{
+		glDeleteVertexArrays(1, &VAO);
+		glDeleteBuffers(1, &VBO);
+		glDeleteBuffers(1, &EBO);
+	}
 };
 
+//seperate script for showing wireframe and other debugging things for future
 class Debug : public Script {
 public:
 	Debug(render* render)
@@ -163,9 +324,8 @@ public:
 	}
 
 	bool isDebugModeOn = false;
-
-
 	int flag = 0;
+
 	void Update() override
 	{
 		if (GetAsyncKeyState(VK_TAB) & 0x8000 && flag == 0)
@@ -173,7 +333,7 @@ public:
 			flag = 1;
 			isDebugModeOn = !isDebugModeOn;
 		}
-		else if (GetAsyncKeyState(VK_TAB) == 0) 
+		else if (GetAsyncKeyState(VK_TAB) == 0)
 		{
 			flag = 0;
 		}
@@ -186,18 +346,13 @@ public:
 		{
 			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		}
-	}
-	void Start() 
-	{
-
-	}
+	}	
 };
 
 
 int main()
 {
-
-	VoxelEngine engine = VoxelEngine();
+	VoxelEngine engine = VoxelEngine(900, 700);
 
 	VoxelGeneration voxels(&engine.m_rendering);
 	engine.AddScript(voxels);
@@ -206,6 +361,5 @@ int main()
 	engine.AddScript(debug);
 
 	engine.initialize();
-
 }
 

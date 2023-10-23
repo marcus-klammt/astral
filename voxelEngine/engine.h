@@ -4,14 +4,14 @@
 #include <vector>
 #include <list>
 
-class input 
+
+class input
 {
 public:
 	input()
 	{
 
 	}
-
 	bool isKeyDown(GLFWwindow* window, int key);
 };
 
@@ -25,8 +25,14 @@ public:
 	{
 		inputClass = input();
 	}
-	std::list<Script> scripts;
+	render(int width, int height)
+	{
+		inputClass = input();
+		winSize = glm::vec2(width, height);
+	}
+	std::vector<Script> scripts;
 	std::vector<Shader> shaders;
+	glm::vec2 winSize;
 
 	input inputClass;
 	GLFWwindow* window;
@@ -34,26 +40,11 @@ public:
 	float deltaTime;
 	void initalize();
 	void renderLoop();
+	void onTerminate();
 	void frame();
 	void UpdateCamera();
 };
 
-class Script 
-{
-public:
-
-	Script* script;
-	render* rendering;
-
-	Script() {
-
-	}
-	
-	virtual void Update() {};
-	virtual void Start() {}
-	int index = 0;
-
-};
 
 class Camera
 {
@@ -72,13 +63,14 @@ public:
 	float deltaTime;
 	float MouseSensitivity = 0.1f;
 
+	bool enabled = true;
 	bool firstMouse = true;
 
-	glm::vec3 Position;
-	glm::vec3 Front = glm::vec3(0,0,-1);
-	glm::vec3 Up = glm::vec3(0,1,0);
+	glm::vec3 Position = glm::vec3(0, 0, 0);
+	glm::vec3 Front = glm::vec3(0, 0, -1);
+	glm::vec3 Up = glm::vec3(0, 1, 0);
 	glm::vec3 Right;
-	glm::vec3 WorldUp = glm::vec3(0,1,0);
+	glm::vec3 WorldUp = glm::vec3(0, 1, 0);
 
 	glm::mat4 view;
 	glm::mat4 GetViewMatrix()
@@ -109,7 +101,6 @@ public:
 		Front = glm::normalize(front);
 		Right = glm::normalize(glm::cross(Front, WorldUp));
 		Up = glm::normalize(glm::cross(Right, Front));
-
 	}
 
 	void handleMouse(double xPosIn, double yPosIn)
@@ -129,11 +120,22 @@ public:
 		lastX = xpos;
 		lastY = ypos;
 
-		updateCamera(xoffset, yoffset);
+		if (enabled) {
+			updateCamera(xoffset, yoffset);
+			glfwSetInputMode(rendering->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+		}
+		else
+		{
+			glfwSetInputMode(rendering->window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		}
 	}
 
 	void handleMovement()
 	{
+		if (!enabled)
+			return;
+
 		float velocity = speed * deltaTime;
 
 		if (this->rendering->inputClass.isKeyDown(rendering->window, GLFW_KEY_W))
@@ -155,12 +157,33 @@ public:
 
 		if (this->rendering->inputClass.isKeyDown(rendering->window, GLFW_KEY_LEFT_SHIFT))
 		{
-			speed = 5;
+			speed = 10;
 		}
 		else
 		{
 			speed = 2.5f;
 		}
 	}
+};
+
+
+
+class Script
+{
+public:
+
+	Script* script;
+	render* rendering;
+
+	Script() {
+
+	}
+
+	virtual void OnGui() {};
+	virtual void OnClose() {};
+	virtual void Update() {};
+	virtual void Start() {}
+	int index = 0;
+
 };
 

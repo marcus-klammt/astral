@@ -8,9 +8,9 @@ public:
 	render m_rendering;
 
 	int m_scriptsLoaded;
-	VoxelEngine()
+	VoxelEngine(int width, int height)
 	{
-		m_rendering = render();
+		m_rendering = render(width, height);
 	}
 
 	

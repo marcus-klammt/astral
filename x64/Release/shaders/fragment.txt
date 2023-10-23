@@ -1,0 +1,21 @@
+#version 460 core
+out vec4 FragColor;
+
+uniform float u_time;
+#define PI 3.14159265359
+
+in vec3 color;
+in vec3 fragPosition;
+
+uniform vec3 lightDirection; 
+
+
+void main()
+{
+    
+    vec3 normal = normalize(cross(dFdx(fragPosition), dFdy(fragPosition)));  // Compute normal
+    float diffuse = max(0.0, dot(normal, normalize(lightDirection)));  // Diffuse lighting
+
+    FragColor = vec4(color * diffuse, 1.0); FragColor = vec4(color, 1.0f);
+
+} 
